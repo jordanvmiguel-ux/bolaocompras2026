@@ -81,6 +81,8 @@
         const appIdFirestore = 'bolaocomprasbrasileirao-prod';
         const ADMIN_PASSWORD = "1234";
 
+        const INITIAL_PLAYERS = ["Jordan", "Carlos", "Ana", "Pedro", "Lucas", "Mateus", "Rafael", "Bruno", "Tiago", "Fernanda"];
+
         const INITIAL_TEAMS = [
             { id: 'ath', name: 'Athletico Paranaense' }, { id: 'atm', name: 'Atlético Mineiro' },
             { id: 'bah', name: 'Bahia' }, { id: 'bot', name: 'Botafogo' },
@@ -94,7 +96,6 @@
             { id: 'vas', name: 'Vasco da Gama' }, { id: 'vit', name: 'Vitória' }
         ];
 
-        // Calendário Completo de 38 Rodadas
         const CALENDAR = [
             { r: 1, d: '01/02', games: [['flu','gre'],['bot','cru'],['spa','fla'],['cor','bah'],['mir','vas'],['atm','pal'],['int','ath'],['crt','rbb'],['vit','rem'],['cha','san']] },
             { r: 2, d: '04/02', games: [['fla','int'],['vas','cha'],['san','spa'],['pal','vit'],['rbb','atm'],['cru','crt'],['gre','bot'],['ath','cor'],['bah','flu'],['rem','mir']] },
@@ -128,8 +129,8 @@
             { r: 30, d: '11/10', games: [['fla','flu'],['vas','rem'],['spa','vit'],['pal','cor'],['rbb','cru'],['atm','san'],['gre','int'],['crt','bot'],['bah','mir'],['cha','ath']] },
             { r: 31, d: '18/10', games: [['flu','san'],['bot','cha'],['spa','vas'],['cor','vit'],['mir','int'],['atm','crt'],['gre','cru'],['ath','pal'],['bah','fla'],['rem','rbb']] },
             { r: 32, d: '25/10', games: [['fla','atm'],['vas','cor'],['san','bah'],['pal','rbb'],['mir','spa'],['cru','rem'],['int','bot'],['crt','gre'],['vit','ath'],['cha','flu']] },
-            { r: 33, d: '28/10', games: [['flu','int'],['vas','fla'],['san','pal'],['cor','mir'],['rbb','cha'],['atm','cru'],['gre','ath'],['crt','vit'],['bah','spa'],['rem', 'bot']] },
-            { r: 34, d: '04/11', games: [['fla','gre'],['bot','atm'],['spa','cor'],['pal','rem'],['rbb','san'],['cru','bah'],['int','crt'],['ath','vas'],['vit','flu'],['cha','mir']] },
+            { r: 33, d: '28/10', games: [['flu','int'],['vas','fla'],['san','pal'],['cor','mir'],['rbb','cha'],['atm','cru'],['gre','ath'],['crt','vit'],['bah','spa']] },
+            { r: 34, d: '04/11', games: [['rem','bot'],['fla','gre'],['bot','atm'],['spa','cor'],['pal','rem'],['rbb','san'],['cru','bah'],['int','crt'],['ath','vas'],['vit','flu'],['cha','mir']] },
             { r: 35, d: '18/11', games: [['fla','ath'],['vas','int'],['spa','flu'],['cor','bot'],['mir','atm'],['cru','pal'],['gre','bah'],['crt','san'],['vit','rbb'],['rem','cha']] },
             { r: 36, d: '22/11', games: [['flu','mir'],['bot','spa'],['san','gre'],['pal','fla'],['rbb','vas'],['atm','cor'],['int','vit'],['ath','rem'],['bah','crt'],['cha','cru']] },
             { r: 37, d: '29/11', games: [['flu','cru'],['bot','bah'],['spa','rem'],['cor','gre'],['mir','ath'],['atm','vas'],['int','rbb'],['crt','fla'],['vit','san'],['cha','pal']] },
@@ -146,7 +147,7 @@
             return <span ref={containerRef} className={`inline-flex items-center justify-center ${className}`} dangerouslySetInnerHTML={{ __html: `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px;"></i>` }} />;
         };
 
-        // --- COMPONENTES DE INTERFACE ---
+        // --- SUBCOMPONENTES ---
 
         const Header = ({ isDarkMode, setIsDarkMode, setView, view, selectedPlayer, players, setSelectedPlayer }) => (
             <header className={`sticky top-0 z-50 p-4 pb-0 backdrop-blur-md border-b ${isDarkMode ? 'bg-black/80 border-white/5' : 'bg-white/80 border-black/5'}`}>
@@ -364,6 +365,8 @@
         };
 
         const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, isDarkMode, glassClass, themeText, db, setView, populateOfficialCalendar }) => {
+            const [newPlayerName, setNewPlayerName] = useState("");
+            
             const handleFileUpload = (e, id, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -372,9 +375,22 @@
                     const base64String = reader.result;
                     const coll = type === 'players' ? 'players' : 'teams';
                     await updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', coll, id), { [type === 'players' ? 'avatar' : 'logo']: base64String });
-                    alert("Imagem enviada com sucesso!");
+                    alert("Imagem enviada!");
                 };
                 reader.readAsDataURL(file);
+            };
+
+            const handleAddPlayer = async () => {
+                if (!newPlayerName.trim()) return;
+                await addDoc(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'players'), { 
+                    name: newPlayerName.trim(), 
+                    points: 0, 
+                    bonusPoints: 0, 
+                    totalPoints: 0, 
+                    avatar: "" 
+                });
+                setNewPlayerName("");
+                alert("Jogador adicionado!");
             };
 
             if (!adminAuth) return (
@@ -429,19 +445,35 @@
                     )}
 
                     {adminTab === 'jogadores' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {players.map(p => (
-                                <div key={p.id} className={`${glassClass} p-6 rounded-3xl space-y-4`}>
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full border border-emerald-500/20 overflow-hidden bg-black/20">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div><span className={`font-black uppercase italic text-sm ${themeText}`}>{p.name}</span></div>
-                                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id))} className="text-red-500/50 hover:text-red-500 p-2 rounded-lg transition-all"><LucideIcon name="trash-2" size={18}/></button>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <span className="text-[10px] font-black uppercase text-zinc-500 italic">Bio-Foto Upload</span>
-                                        <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, p.id, 'players')} className="block w-full text-[10px] text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-emerald-500 file:text-black hover:file:bg-emerald-400" />
-                                    </div>
+                        <div className="space-y-6">
+                            <div className={`${glassClass} p-6 rounded-3xl space-y-4`}>
+                                <h3 className={`font-black uppercase text-xs ${themeText}`}>Novo Jogador</h3>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Nome do Novo Jogador" 
+                                        className={`flex-1 p-4 rounded-2xl border font-black outline-none ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`} 
+                                        value={newPlayerName} 
+                                        onChange={e => setNewPlayerName(e.target.value)} 
+                                    />
+                                    <button onClick={handleAddPlayer} className="bg-emerald-500 text-black px-6 py-4 rounded-2xl font-black uppercase text-xs">Adicionar</button>
                                 </div>
-                            ))}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {players.map(p => (
+                                    <div key={p.id} className={`${glassClass} p-6 rounded-3xl space-y-4`}>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full border border-emerald-500/20 overflow-hidden bg-black/20">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div><span className={`font-black uppercase italic text-sm ${themeText}`}>{p.name}</span></div>
+                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id))} className="text-red-500/50 hover:text-red-500 p-2 rounded-lg transition-all"><LucideIcon name="trash-2" size={18}/></button>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <span className="text-[10px] font-black uppercase text-zinc-500 italic">Bio-Foto Upload</span>
+                                            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, p.id, 'players')} className="block w-full text-[10px] text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-emerald-500 file:text-black hover:file:bg-emerald-400" />
+                                        </div>
+                                        <div className="flex items-center gap-2"><span className="text-[9px] font-black text-zinc-500 uppercase">Pts Bônus:</span><input type="number" className={`w-20 p-2 rounded-lg text-xs font-bold ${isDarkMode ? 'bg-black border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`} defaultValue={p.bonusPoints} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id), { bonusPoints: parseInt(e.target.value) || 0 })} /></div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -521,8 +553,8 @@
             const populateOfficialCalendar = async () => {
                 const matchesRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches');
                 const snap = await getDocs(matchesRef);
-                // Evitar duplicatas
-                if (snap.size > 100) return alert("Calendário já parece estar preenchido!");
+                // Evitar duplicatas em excesso, mas permitir repopular se for necessário
+                if (snap.size > 400) return alert("Calendário já parece estar preenchido!");
                 
                 for (const r of CALENDAR) {
                     for (const g of r.games) {
@@ -537,13 +569,16 @@
                 await setDoc(configRef, { rodada_fechada: false });
                 const teamsRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'teams');
                 for (const t of INITIAL_TEAMS) { await setDoc(doc(teamsRef, t.id), { name: t.name, logo: "" }); }
-                await populateOfficialCalendar();
+                // Só popula se não houver jogos
+                const matchesRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches');
+                const mSnap = await getDocs(matchesRef);
+                if(mSnap.empty) await populateOfficialCalendar();
             };
 
             if (loading) return (
                 <div className="h-screen bg-black flex flex-col items-center justify-center">
                     <div className="w-16 h-16 border-[4px] border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mb-4" />
-                    <p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase">Sincronizando Sistema...</p>
+                    <p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase leading-none">Sincronizando Sistema...</p>
                 </div>
             );
 
