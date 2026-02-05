@@ -128,7 +128,7 @@
             { r: 31, d: '18/10', games: [['flu','san'],['bot','cha'],['spa','vas'],['cor','vit'],['mir','int'],['atm','crt'],['gre','cru'],['ath','pal'],['bah','fla'],['rem','rbb']] },
             { r: 32, d: '25/10', games: [['fla','atm'],['vas','cor'],['san','bah'],['pal','rbb'],['mir','spa'],['cru','rem'],['int','bot'],['crt','gre'],['vit','ath'],['cha','flu']] },
             { r: 33, d: '28/10', games: [['flu','int'],['vas','fla'],['san','pal'],['cor','mir'],['rbb','cha'],['atm','cru'],['gre','ath'],['crt','vit'],['bah','spa']] },
-            { r: 34, d: '04/11', games: [['rem','bot'],['fla','gre'],['bot','atm'],['spa','cor'],['pal','rem'],['rbb','san'],['cru','bah'],['int','crt'],['ath','vas'],['vit','flu'],['cha','mir']] },
+            { r: 34, d: '04/11', games: [['rem','bot'],['fla','gre'],['bot','atm'],['spa','cor'],['pal','rem'],['rbb','san'],['cru','bah'],['int','cor'],['ath','vas'],['vit','flu'],['cha','mir']] },
             { r: 35, d: '18/11', games: [['fla','ath'],['vas','int'],['spa','flu'],['cor','bot'],['mir','atm'],['cru','pal'],['gre','bah'],['crt','san'],['vit','rbb'],['rem','cha']] },
             { r: 36, d: '22/11', games: [['flu','mir'],['bot','spa'],['san','gre'],['pal','fla'],['rbb','vas'],['atm','cor'],['int','vit'],['ath','rem'],['bah','crt'],['cha','cru']] },
             { r: 37, d: '29/11', games: [['flu','cru'],['bot','bah'],['spa','rem'],['cor','gre'],['mir','ath'],['atm','vas'],['int','rbb'],['crt','fla'],['vit','san'],['cha','pal']] },
@@ -345,7 +345,7 @@
                             <tbody className={`divide-y ${isDarkMode ? 'divide-white/5' : 'divide-black/5'}`}>
                                 {sorted.map((p, idx) => (
                                     <tr key={p.id} className={`${selectedPlayer?.id === p.id ? 'bg-emerald-500/10' : ''}`}>
-                                        <td className={`p-6 text-2xl font-black italic ${idx < 3 ? 'text-emerald-500' : 'text-zinc-700'}`}>{idx + 1}</td>
+                                        <td className={`p-6 text-2xl font-black italic ${idx < 3 ? 'text-emerald-500' : 'text-zinc-700'}`}>{String(idx + 1).padStart(2, '0')}</td>
                                         <td className="p-6 flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-full border-2 overflow-hidden shadow-md flex-shrink-0 ${isDarkMode ? 'bg-zinc-800 border-emerald-500/20' : 'bg-zinc-100 border-emerald-500/10'}`}>
                                                 {p.avatar ? <img src={p.avatar} className="w-full h-full object-cover" /> : <LucideIcon name="user" className="m-auto mt-2 text-zinc-400" size={24} />}
@@ -391,6 +391,12 @@
                 alert("Jogador adicionado!");
             };
 
+            const handleDeleteMatch = async (id) => {
+                if (!confirm("Deseja realmente excluir este jogo? Esta ação removerá duplicatas ou erros permanentemente.")) return;
+                await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', id));
+                alert("Jogo excluído do sistema!");
+            };
+
             if (!adminAuth) return (
                 <div className="p-12 h-[calc(100vh-100px)] flex items-center justify-center">
                     <div className={`${glassClass} p-10 rounded-3xl w-full max-sm text-center relative shadow-2xl`}>
@@ -428,7 +434,7 @@
                             </select>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {matches.filter(m => Number(m.round) === Number(currentRound)).map(m => (
-                                    <div key={m.id} className={`${glassClass} p-4 flex items-center gap-4 rounded-2xl`}>
+                                    <div key={m.id} className={`${glassClass} p-4 flex items-center gap-4 rounded-2xl relative group`}>
                                         <span className={`text-[10px] flex-1 text-right truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.homeId)?.name}</span>
                                         <div className="flex items-center gap-2">
                                             <input type="number" defaultValue={m.homeScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {homeScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
@@ -436,6 +442,13 @@
                                             <input type="number" defaultValue={m.awayScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {awayScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
                                         </div>
                                         <span className={`text-[10px] flex-1 truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.awayId)?.name}</span>
+                                        <button 
+                                            onClick={() => handleDeleteMatch(m.id)}
+                                            className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all flex-shrink-0"
+                                            title="Excluir Jogo Duplicado"
+                                        >
+                                            <LucideIcon name="trash-2" size={16} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
