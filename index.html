@@ -18,7 +18,6 @@
             font-family: 'Inter', sans-serif;
             transition: background-color 0.3s ease, color 0.3s ease;
         }
-        /* Efeito de Vidro Adaptativo */
         .glass-dark {
             background: rgba(24, 24, 27, 0.7);
             backdrop-filter: blur(16px);
@@ -49,7 +48,6 @@
 <body>
     <div id="root"></div>
 
-    <!-- Firebase SDK Config -->
     <script type="importmap">
         {
           "imports": {
@@ -63,7 +61,7 @@
     <script type="text/babel" data-type="module">
         import { initializeApp } from 'firebase/app';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, deleteDoc, addDoc, query, orderBy } from 'firebase/firestore';
 
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -81,7 +79,6 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appIdFirestore = 'bolaocomprasbrasileirao-prod';
-
         const ADMIN_PASSWORD = "1234";
 
         const INITIAL_TEAMS = [
@@ -97,37 +94,66 @@
             { id: 'vas', name: 'Vasco da Gama' }, { id: 'vit', name: 'Vitória' }
         ];
 
-        // --- SUBCOMPONENTES ESTÁVEIS ---
+        // Calendário Completo de 38 Rodadas
+        const CALENDAR = [
+            { r: 1, d: '01/02', games: [['flu','gre'],['bot','cru'],['spa','fla'],['cor','bah'],['mir','vas'],['atm','pal'],['int','ath'],['crt','rbb'],['vit','rem'],['cha','san']] },
+            { r: 2, d: '04/02', games: [['fla','int'],['vas','cha'],['san','spa'],['pal','vit'],['rbb','atm'],['cru','crt'],['gre','bot'],['ath','cor'],['bah','flu'],['rem','mir']] },
+            { r: 3, d: '11/02', games: [['flu','bot'],['vas','bah'],['spa','gre'],['cor','rbb'],['mir','cru'],['atm','rem'],['int','pal'],['ath','san'],['vit','fla'],['cha','crt']] },
+            { r: 4, d: '25/02', games: [['fla','mir'],['bot','vit'],['san','vas'],['pal','flu'],['rbb','ath'],['cru','cor'],['gre','atm'],['crt','spa'],['bah','cha'],['rem','int']] },
+            { r: 5, d: '11/03', games: [['fla','cru'],['vas','pal'],['spa','cha'],['cor','crt'],['mir','san'],['atm','int'],['gre','rbb'],['ath','bot'],['bah','vit'],['rem','flu']] },
+            { r: 6, d: '15/03', games: [['flu','ath'],['bot','fla'],['san','cor'],['pal','mir'],['rbb','spa'],['cru','vas'],['int','bah'],['crt','rem'],['vit','atm'],['cha','gre']] },
+            { r: 7, d: '18/03', games: [['fla','rem'],['vas','flu'],['san','int'],['pal','bot'],['mir','crt'],['atm','spa'],['gre','vit'],['ath','cru'],['bah','rbb'],['cha','cor']] },
+            { r: 8, d: '22/03', games: [['flu','atm'],['vas','gre'],['spa','pal'],['cor','fla'],['rbb','bot'],['cru','san'],['int','cha'],['ath','crt'],['vit','mir'],['rem','bah']] },
+            { r: 9, d: '01/04', games: [['flu','cor'],['bot','mir'],['san','rem'],['pal','gre'],['rbb','fla'],['cru','vit'],['int','spa'],['crt','vas'],['bah','ath'],['cha','atm']] },
+            { r: 10, d: '05/04', games: [['fla','san'],['vas','bot'],['spa','cru'],['cor','int'],['mir','rbb'],['atm','ath'],['gre','rem'],['crt','flu'],['bah','pal'],['cha','vit']] },
+            { r: 11, d: '12/04', games: [['flu','fla'],['bot','crt'],['san','atm'],['cor','pal'],['mir','bah'],['cru','rbb'],['int','gre'],['ath','cha'],['vit','spa'],['rem','vas']] },
+            { r: 12, d: '19/04', games: [['fla','bah'],['vas','spa'],['san','flu'],['pal','ath'],['rbb','rem'],['cru','gre'],['int','mir'],['crt','atm'],['vit','cor'],['cha','bot']] },
+            { r: 13, d: '25/04', games: [['flu','cha'],['bot','int'],['spa','mir'],['cor','vas'],['rbb','pal'],['atm','fla'],['gre','crt'],['ath','vit'],['bah','san'],['rem','cru']] },
+            { r: 14, d: '03/05', games: [['fla','vas'],['bot','rem'],['spa','bah'],['pal','san'],['mir','cor'],['cru','atm'],['int','flu'],['ath','gre'],['vit','crt'],['cha','rbb']] },
+            { r: 15, d: '10/05', games: [['flu','vit'],['vas','ath'],['san','rbb'],['cor','spa'],['mir','cha'],['atm','bot'],['gre','fla'],['crt','int'],['bah','cru'],['rem','pal']] },
+            { r: 16, d: '17/05', games: [['flu','spa'],['bot','cor'],['san','crt'],['pal','cru'],['rbb','vit'],['atm','mir'],['int','vas'],['ath','fla'],['bah','gre'],['cha','rem']] },
+            { r: 17, d: '24/05', games: [['fla','pal'],['vas','rbb'],['spa','bot'],['cor','atm'],['mir','flu'],['cru','cha'],['gre','san'],['crt','bah'],['vit','int'],['rem','ath']] },
+            { r: 18, d: '31/05', games: [['fla','crt'],['vas','atm'],['san','vit'],['pal','cha'],['rbb','int'],['cru','flu'],['gre','cor'],['ath','mir'],['bah','bot'],['rem','spa']] },
+            { r: 19, d: '22/07', games: [['flu','rbb'],['bot','san'],['spa','ath'],['cor','rem'],['mir','gre'],['atm','bah'],['int','cru'],['crt','pal'],['vit','vas'],['cha','fla']] },
+            { r: 20, d: '26/07', games: [['fla','spa'],['vas','mir'],['san','cha'],['pal','atm'],['rbb','crt'],['cru','bot'],['gre','flu'],['ath','int'],['bah','cor'],['rem','vit']] },
+            { r: 21, d: '29/07', games: [['flu','bah'],['bot','gre'],['spa','san'],['cor','ath'],['mir','rem'],['atm','rbb'],['int','fla'],['cru','crt'],['vit','pal'],['cha','vas']] },
+            { r: 22, d: '09/08', games: [['fla','vit'],['bot','flu'],['san','ath'],['pal','int'],['rbb','cor'],['cru','mir'],['gre','spa'],['crt','cha'],['bah','vas'],['rem','atm']] },
+            { r: 23, d: '16/08', games: [['flu','pal'],['vas','san'],['spa','crt'],['cor','cru'],['mir','fla'],['atm','gre'],['int','rem'],['ath','rbb'],['vit','bot'],['cha','bah']] },
+            { r: 24, d: '23/08', games: [['flu','rem'],['bot','ath'],['san','mir'],['pal','vas'],['rbb','gre'],['cru','fla'],['int','atm'],['crt','cor'],['vit','bah'],['cha','spa']] },
+            { r: 25, d: '30/08', games: [['fla','bot'],['vas','cru'],['spa','rbb'],['cor','san'],['mir','pal'],['atm','vit'],['gre','cha'],['ath','flu'],['bah','int'],['rem','crt']] },
+            { r: 26, d: '06/09', games: [['flu','vas'],['bot','pal'],['spa','atm'],['cor','cha'],['rbb','bah'],['cru','ath'],['int','san'],['crt','mir'],['vit','gre'],['rem','fla']] },
+            { r: 27, d: '13/09', games: [['fla','cor'],['bot','rbb'],['san','cru'],['pal','spa'],['mir','vit'],['atm','flu'],['gre','vas'],['ath','crt'],['bah','rem'],['cha','int']] },
+            { r: 28, d: '20/09', games: [['fla','rbb'],['vas','crt'],['spa','int'],['cor','flu'],['mir','bot'],['atm','cha'],['gre','pal'],['ath','bah'],['vit','cru'],['rem','san']] },
+            { r: 29, d: '07/10', games: [['flu','crt'],['bot','vas'],['san','fla'],['pal','bah'],['rbb','mir'],['cru','spa'],['int','cor'],['ath','atm'],['vit','cha'],['rem','gre']] },
+            { r: 30, d: '11/10', games: [['fla','flu'],['vas','rem'],['spa','vit'],['pal','cor'],['rbb','cru'],['atm','san'],['gre','int'],['crt','bot'],['bah','mir'],['cha','ath']] },
+            { r: 31, d: '18/10', games: [['flu','san'],['bot','cha'],['spa','vas'],['cor','vit'],['mir','int'],['atm','crt'],['gre','cru'],['ath','pal'],['bah','fla'],['rem','rbb']] },
+            { r: 32, d: '25/10', games: [['fla','atm'],['vas','cor'],['san','bah'],['pal','rbb'],['mir','spa'],['cru','rem'],['int','bot'],['crt','gre'],['vit','ath'],['cha','flu']] },
+            { r: 33, d: '28/10', games: [['flu','int'],['vas','fla'],['san','pal'],['cor','mir'],['rbb','cha'],['atm','cru'],['gre','ath'],['crt','vit'],['bah','spa'],['rem', 'bot']] },
+            { r: 34, d: '04/11', games: [['fla','gre'],['bot','atm'],['spa','cor'],['pal','rem'],['rbb','san'],['cru','bah'],['int','crt'],['ath','vas'],['vit','flu'],['cha','mir']] },
+            { r: 35, d: '18/11', games: [['fla','ath'],['vas','int'],['spa','flu'],['cor','bot'],['mir','atm'],['cru','pal'],['gre','bah'],['crt','san'],['vit','rbb'],['rem','cha']] },
+            { r: 36, d: '22/11', games: [['flu','mir'],['bot','spa'],['san','gre'],['pal','fla'],['rbb','vas'],['atm','cor'],['int','vit'],['ath','rem'],['bah','crt'],['cha','cru']] },
+            { r: 37, d: '29/11', games: [['flu','cru'],['bot','bah'],['spa','rem'],['cor','gre'],['mir','ath'],['atm','vas'],['int','rbb'],['crt','fla'],['vit','san'],['cha','pal']] },
+            { r: 38, d: '02/12', games: [['fla','cha'],['vas','vit'],['san','bot'],['pal','crt'],['rbb','flu'],['cru','int'],['gre','mir'],['ath','spa'],['cor','rem'],['atm','bah']] }
+        ];
 
-        // LucideIcon corrigido para evitar NotFoundError no React unmount
         const LucideIcon = ({ name, size = 24, className = "" }) => {
             const containerRef = useRef(null);
-
             useEffect(() => {
                 if (window.lucide && containerRef.current) {
-                    window.lucide.createIcons({
-                        root: containerRef.current
-                    });
+                    window.lucide.createIcons({ root: containerRef.current });
                 }
             }, [name]);
-
-            return (
-                <span 
-                    ref={containerRef}
-                    className={`inline-flex items-center justify-center ${className}`}
-                    dangerouslySetInnerHTML={{ 
-                        __html: `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px;"></i>` 
-                    }}
-                />
-            );
+            return <span ref={containerRef} className={`inline-flex items-center justify-center ${className}`} dangerouslySetInnerHTML={{ __html: `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px;"></i>` }} />;
         };
+
+        // --- COMPONENTES DE INTERFACE ---
 
         const Header = ({ isDarkMode, setIsDarkMode, setView, view, selectedPlayer, players, setSelectedPlayer }) => (
             <header className={`sticky top-0 z-50 p-4 pb-0 backdrop-blur-md border-b ${isDarkMode ? 'bg-black/80 border-white/5' : 'bg-white/80 border-black/5'}`}>
-                <div className="max-w-4xl mx-auto flex justify-between items-center mb-4">
+                <div className="max-w-6xl mx-auto flex justify-between items-center mb-4 px-2">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-emerald-500 rounded-lg shadow-lg">
-                            <LucideIcon name="trophy" className="text-black" />
+                            <LucideIcon name="trophy" className="text-black" size={24} />
                         </div>
                         <div>
                             <h1 className={`text-xl font-black uppercase italic leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>Bolão <span className="text-emerald-500">2026</span></h1>
@@ -135,21 +161,18 @@
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => setIsDarkMode(!isDarkMode)} 
-                            className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-zinc-800 text-yellow-400' : 'bg-zinc-100 text-zinc-600'}`}
-                        >
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-zinc-800 text-yellow-400' : 'bg-zinc-100 text-zinc-600'}`}>
                             <LucideIcon name={isDarkMode ? 'sun' : 'moon'} size={20} />
                         </button>
-                        <button onClick={() => setView('admin')} className={`p-2 rounded-xl transition-all ${view === 'admin' ? 'bg-emerald-500 text-black' : (isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-100 text-zinc-600')}`}>
+                        <button onClick={() => setView('admin')} className={`p-2 rounded-xl transition-all ${view === 'admin' ? 'bg-emerald-500 text-black shadow-lg' : (isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-100 text-zinc-600')}`}>
                             <LucideIcon name="settings" size={20} />
                         </button>
                     </div>
                 </div>
                 {view !== 'admin' && (
-                    <div className="max-w-4xl mx-auto mb-4 flex items-center gap-3">
-                        <div className={`w-12 h-12 border-2 rounded-full flex items-center justify-center overflow-hidden shadow-lg ${isDarkMode ? 'bg-zinc-900 border-emerald-500/30' : 'bg-zinc-50 border-emerald-500/10'}`}>
-                            {selectedPlayer?.avatar ? <img src={selectedPlayer.avatar} className="w-full h-full object-cover" /> : <LucideIcon name="user" className="text-emerald-500/20" />}
+                    <div className="max-w-6xl mx-auto mb-4 flex items-center gap-3 px-2">
+                        <div className={`w-12 h-12 border-2 rounded-full flex items-center justify-center overflow-hidden shadow-lg flex-shrink-0 ${isDarkMode ? 'bg-zinc-900 border-emerald-500/30' : 'bg-zinc-50 border-emerald-500/10'}`}>
+                            {selectedPlayer?.avatar ? <img src={selectedPlayer.avatar} className="w-full h-full object-cover" /> : <LucideIcon name="user" className="text-emerald-500/20" size={20} />}
                         </div>
                         <div className="flex-1">
                             <select 
@@ -157,7 +180,7 @@
                                 onChange={(e) => setSelectedPlayer(players.find(x => x.id === e.target.value))}
                                 className={`w-full border rounded-xl p-3 font-bold text-sm focus:border-emerald-500 outline-none appearance-none ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`}
                             >
-                                <option value="">QUEM ESTÁ PALPITANDO?</option>
+                                <option value="">AUTENTICAR NO TERMINAL...</option>
                                 {players.map(p => <option key={p.id} value={p.id}>{String(p.name || "").toUpperCase()}</option>)}
                             </select>
                         </div>
@@ -167,9 +190,10 @@
         );
 
         const Navigation = ({ setView, view, isDarkMode }) => (
-            <nav className={`fixed bottom-0 left-0 right-0 backdrop-blur-2xl border-t p-4 z-50 flex justify-around items-center max-w-4xl mx-auto md:rounded-t-[40px] shadow-2xl ${isDarkMode ? 'bg-black/95 border-white/5' : 'bg-white/95 border-black/5'}`}>
+            <nav className={`fixed bottom-0 left-0 right-0 backdrop-blur-2xl border-t p-4 z-50 flex justify-around items-center max-w-6xl mx-auto md:rounded-t-[40px] shadow-2xl ${isDarkMode ? 'bg-black/95 border-white/5' : 'bg-white/95 border-black/5'}`}>
                 {[
                     { id: 'palpites', icon: 'zap', label: 'Arena' },
+                    { id: 'bonus', icon: 'target', label: 'Quem é Quem' },
                     { id: 'ranking', icon: 'bar-chart-3', label: 'Ranking' }
                 ].map(item => (
                     <button key={item.id} onClick={() => setView(item.id)} className={`flex flex-col items-center transition-all ${view === item.id ? 'text-emerald-500 scale-110' : (isDarkMode ? 'text-zinc-600' : 'text-zinc-400')}`}>
@@ -184,53 +208,127 @@
             const handleSave = async (matchId, h, a) => {
                 if (!selectedPlayer) return;
                 const predId = `${selectedPlayer.id}_${matchId}`;
-                await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'predictions', predId), {
-                    playerId: selectedPlayer.id, matchId, homeScore: h, awayScore: a
-                });
+                await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'predictions', predId), { playerId: selectedPlayer.id, matchId, homeScore: h, awayScore: a });
             };
-            const filtered = matches.filter(m => m.round === currentRound);
+            const filtered = matches.filter(m => Number(m.round) === Number(currentRound));
             return (
-                <div className="p-4 pb-32 max-w-4xl mx-auto">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="p-4 pb-32 max-w-3xl mx-auto px-4">
+                    <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-2">
-                            <LucideIcon name="calendar" className="text-emerald-500" size={18} />
-                            <span className={`text-lg font-black uppercase italic ${themeText}`}>Arena Rodada {currentRound}</span>
+                            <LucideIcon name="calendar" className="text-emerald-500" size={20} />
+                            <span className={`text-xl font-black uppercase italic ${themeText}`}>Arena Rodada {currentRound}</span>
                         </div>
-                        <select value={currentRound} onChange={e => setCurrentRound(parseInt(e.target.value))} className={`border rounded-lg px-3 py-1 text-xs font-black outline-none ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`}>
+                        <select value={currentRound} onChange={e => setCurrentRound(parseInt(e.target.value))} className={`border rounded-lg px-4 py-2 text-sm font-black outline-none ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`}>
                             {[...Array(38)].map((_, i) => <option key={i+1} value={i+1}>R{i+1}</option>)}
                         </select>
                     </div>
-                    <div className="space-y-4">
-                        {filtered.map(match => {
+                    <div className="flex flex-col gap-6">
+                        {filtered.length > 0 ? filtered.map(match => {
                             const pred = predictions.find(p => p.playerId === selectedPlayer?.id && p.matchId === match.id);
                             const hT = teams.find(t => t.id === match.homeId);
                             const aT = teams.find(t => t.id === match.awayId);
                             return (
-                                <div key={match.id} className={`${glassClass} rounded-2xl p-6 relative overflow-hidden`}>
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/30" />
-                                    <div className="flex items-center justify-between">
+                                <div key={match.id} className={`${glassClass} rounded-3xl p-8 relative overflow-hidden transition-all hover:scale-[1.01]`}>
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500/40" />
+                                    <div className="flex items-center justify-between gap-4">
                                         <div className="flex-1 flex flex-col items-center">
-                                            <div className={`w-20 h-20 mb-3 flex items-center justify-center p-2 rounded-lg overflow-hidden ${isDarkMode ? 'bg-black/60' : 'bg-zinc-100'}`}>
-                                                {hT?.logo ? <img src={hT.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" className="text-zinc-400" size={32} />}
+                                            <div className={`w-24 h-24 mb-4 flex items-center justify-center p-3 rounded-2xl overflow-hidden shadow-xl ${isDarkMode ? 'bg-black/60 border border-white/5' : 'bg-zinc-50 border border-black/5'}`}>
+                                                {hT?.logo ? <img src={hT.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" className="text-zinc-400" size={40} />}
                                             </div>
-                                            <span className={`text-[10px] font-black uppercase text-center leading-tight ${themeText}`}>{hT?.name}</span>
+                                            <span className={`text-[11px] font-black uppercase text-center leading-tight tracking-tight ${themeText}`}>{hT?.name}</span>
                                         </div>
-                                        <div className="flex items-center gap-3 px-4">
-                                            <input type="number" disabled={config.rodada_fechada || !selectedPlayer} value={pred?.homeScore ?? ""} onChange={e => handleSave(match.id, e.target.value, pred?.awayScore || "")} className={`w-12 h-16 text-center border rounded-2xl font-black text-2xl focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black border-white/10 text-emerald-400' : 'bg-zinc-50 border-black/10 text-emerald-600'}`} />
-                                            <span className={`font-black italic text-xs ${isDarkMode ? 'text-zinc-700' : 'text-zinc-300'}`}>X</span>
-                                            <input type="number" disabled={config.rodada_fechada || !selectedPlayer} value={pred?.awayScore ?? ""} onChange={e => handleSave(match.id, pred?.homeScore || "", e.target.value)} className={`w-12 h-16 text-center border rounded-2xl font-black text-2xl focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black border-white/10 text-emerald-400' : 'bg-zinc-50 border-black/10 text-emerald-600'}`} />
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <input type="number" disabled={config.rodada_fechada || !selectedPlayer} value={pred?.homeScore ?? ""} onChange={e => handleSave(match.id, e.target.value, pred?.awayScore || "")} className={`w-14 h-20 text-center border rounded-2xl font-black text-3xl focus:border-emerald-500 outline-none transition-all ${isDarkMode ? 'bg-black border-white/10 text-emerald-400' : 'bg-white border-black/10 text-emerald-600 shadow-inner'}`} />
+                                                <span className={`font-black italic text-sm ${isDarkMode ? 'text-zinc-700' : 'text-zinc-300'}`}>X</span>
+                                                <input type="number" disabled={config.rodada_fechada || !selectedPlayer} value={pred?.awayScore ?? ""} onChange={e => handleSave(match.id, pred?.homeScore || "", e.target.value)} className={`w-14 h-20 text-center border rounded-2xl font-black text-3xl focus:border-emerald-500 outline-none transition-all ${isDarkMode ? 'bg-black border-white/10 text-emerald-400' : 'bg-white border-black/10 text-emerald-600 shadow-inner'}`} />
+                                            </div>
+                                            {match.homeScore !== undefined && (
+                                                <div className="px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                                                    <span className="text-[10px] font-black text-emerald-500 uppercase italic">Oficial: {match.homeScore} x {match.awayScore}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex-1 flex flex-col items-center">
-                                            <div className={`w-20 h-20 mb-3 flex items-center justify-center p-2 rounded-lg overflow-hidden ${isDarkMode ? 'bg-black/60' : 'bg-zinc-100'}`}>
-                                                {aT?.logo ? <img src={aT.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" className="text-zinc-400" size={32} />}
+                                            <div className={`w-24 h-24 mb-4 flex items-center justify-center p-3 rounded-2xl overflow-hidden shadow-xl ${isDarkMode ? 'bg-black/60 border border-white/5' : 'bg-zinc-50 border border-black/5'}`}>
+                                                {aT?.logo ? <img src={aT.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" className="text-zinc-400" size={40} />}
                                             </div>
-                                            <span className={`text-[10px] font-black uppercase text-center leading-tight ${themeText}`}>{aT?.name}</span>
+                                            <span className={`text-[11px] font-black uppercase text-center leading-tight tracking-tight ${themeText}`}>{aT?.name}</span>
                                         </div>
                                     </div>
                                 </div>
                             );
-                        })}
+                        }) : <div className="col-span-full py-20 text-center text-zinc-500 font-bold uppercase tracking-widest italic animate-pulse">Nenhum confronto registrado nesta rodada. Vá ao painel admin e sincronize o calendário.</div>}
                     </div>
+                </div>
+            );
+        };
+
+        const BonusView = ({ selectedPlayer, teams, isDarkMode, glassClass, themeText, db }) => {
+            const [bonus, setBonus] = useState({ g4: [], z4: [] });
+            const [isLocked, setIsLocked] = useState(false);
+            useEffect(() => {
+                if (selectedPlayer) {
+                    const bonusRef = doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'bonus', selectedPlayer.id);
+                    onSnapshot(bonusRef, (docSnap) => {
+                        if (docSnap.exists()) { setBonus(docSnap.data()); setIsLocked(true); } 
+                        else { setBonus({ g4: [], z4: [] }); setIsLocked(false); }
+                    });
+                }
+            }, [selectedPlayer]);
+
+            const toggleSelection = (teamId, category) => {
+                if (isLocked) return;
+                const currentList = bonus[category] || [];
+                const other = category === 'g4' ? 'z4' : 'g4';
+                if (bonus[other].includes(teamId)) return alert("Time já selecionado na outra categoria!");
+                if (currentList.includes(teamId)) setBonus({ ...bonus, [category]: currentList.filter(id => id !== teamId) });
+                else {
+                    if (currentList.length >= 4) return alert("Limite de 4 times atingido!");
+                    setBonus({ ...bonus, [category]: [...currentList, teamId] });
+                }
+            };
+
+            const confirmSelection = async () => {
+                if (bonus.g4.length !== 4 || bonus.z4.length !== 4) return alert("Selecione 4 times em cada!");
+                if (!confirm("Confirma? Não poderá alterar depois.")) return;
+                await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'bonus', selectedPlayer.id), { ...bonus, playerId: selectedPlayer.id });
+                alert("Bloqueado com sucesso!");
+            };
+
+            if (!selectedPlayer) return <div className="p-20 text-center uppercase font-black text-zinc-600">Selecione um participante</div>;
+
+            return (
+                <div className="p-4 pb-32 max-w-6xl mx-auto px-4 animate-in fade-in">
+                    <div className="text-center mb-10">
+                        <h2 className={`text-2xl font-black uppercase italic mb-2 ${themeText}`}>Quem é <span className="text-emerald-500">Quem?</span></h2>
+                    </div>
+                    {isLocked && <div className="glass-dark mb-8 border-amber-500/40 bg-amber-950/20 p-6 rounded-3xl flex items-center gap-4"><LucideIcon name="lock" className="text-amber-500" size={32} /><div><p className="text-amber-500 font-black uppercase text-sm">Projeções Definitivas</p></div></div>}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className={`${glassClass} rounded-3xl p-6 border-emerald-500/20`}>
+                            <h3 className={`font-black uppercase mb-4 ${themeText}`}>G4 (Elite)</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {teams.sort((a,b)=>a.name.localeCompare(b.name)).map(t => (
+                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'g4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase ${bonus.g4.includes(t.id) ? 'bg-emerald-500 text-black shadow-lg' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
+                                        <div className="w-8 h-8 mx-auto mb-2">{t.logo ? <img src={t.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" size={16} />}</div>
+                                        {t.name.split(' ')[0]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className={`${glassClass} rounded-3xl p-6 border-red-500/20`}>
+                            <h3 className={`font-black uppercase mb-4 ${themeText}`}>Z4 (Rebaixamento)</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {teams.sort((a,b)=>a.name.localeCompare(b.name)).map(t => (
+                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'z4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase ${bonus.z4.includes(t.id) ? 'bg-red-500 text-black shadow-lg' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
+                                        <div className="w-8 h-8 mx-auto mb-2">{t.logo ? <img src={t.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" size={16} />}</div>
+                                        {t.name.split(' ')[0]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {!isLocked && <div className="mt-12 text-center"><button onClick={confirmSelection} disabled={bonus.g4.length !== 4 || bonus.z4.length !== 4} className="px-12 py-5 rounded-3xl font-black uppercase italic shadow-2xl bg-emerald-500 text-black">Confirmar</button></div>}
                 </div>
             );
         };
@@ -238,25 +336,24 @@
         const RankingView = ({ players, selectedPlayer, isDarkMode, glassClass, themeText }) => {
             const sorted = [...players].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
             return (
-                <div className="p-4 pb-32 max-w-4xl mx-auto">
-                    <h2 className={`text-xl font-black uppercase italic mb-6 ${themeText}`}>Painel de <span className="text-emerald-500">Status</span></h2>
-                    <div className={`${glassClass} rounded-2xl overflow-hidden`}>
+                <div className="p-4 pb-32 max-w-6xl mx-auto px-4">
+                    <h2 className={`text-xl font-black uppercase italic mb-6 ${themeText}`}>Ranking <span className="text-emerald-500">Geral</span></h2>
+                    <div className={`${glassClass} rounded-3xl overflow-hidden shadow-2xl`}>
                         <table className="w-full text-left">
-                            <thead className={`text-[9px] font-black uppercase border-b ${isDarkMode ? 'bg-white/5 border-white/5 text-emerald-500/50' : 'bg-black/5 border-black/5 text-emerald-600'}`}>
-                                <tr><th className="p-5">#</th><th className="p-5">Participante</th><th className="p-5 text-center">Rodada</th><th className="p-5 text-right">Total</th></tr>
+                            <thead className={`text-[10px] font-black uppercase border-b ${isDarkMode ? 'bg-white/5 border-white/5 text-zinc-500' : 'bg-black/5 border-black/5 text-zinc-600'}`}>
+                                <tr><th className="p-6">#</th><th className="p-6">Bio-ID</th><th className="p-6 text-right">Total</th></tr>
                             </thead>
                             <tbody className={`divide-y ${isDarkMode ? 'divide-white/5' : 'divide-black/5'}`}>
                                 {sorted.map((p, idx) => (
-                                    <tr key={p.id} className={selectedPlayer?.id === p.id ? 'bg-emerald-500/5' : ''}>
-                                        <td className={`p-5 text-xl font-black italic ${isDarkMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{idx + 1}</td>
-                                        <td className="p-5 flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full border overflow-hidden ${isDarkMode ? 'bg-zinc-800 border-emerald-500/20' : 'bg-zinc-100 border-emerald-500/10'}`}>
-                                                {p.avatar ? <img src={p.avatar} className="w-full h-full object-cover" /> : <LucideIcon name="user" className="m-auto mt-2 text-zinc-400" size={18} />}
+                                    <tr key={p.id} className={`${selectedPlayer?.id === p.id ? 'bg-emerald-500/10' : ''}`}>
+                                        <td className={`p-6 text-2xl font-black italic ${idx < 3 ? 'text-emerald-500' : 'text-zinc-700'}`}>{idx + 1}</td>
+                                        <td className="p-6 flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-full border-2 overflow-hidden shadow-md flex-shrink-0 ${isDarkMode ? 'bg-zinc-800 border-emerald-500/20' : 'bg-zinc-100 border-emerald-500/10'}`}>
+                                                {p.avatar ? <img src={p.avatar} className="w-full h-full object-cover" /> : <LucideIcon name="user" className="m-auto mt-2 text-zinc-400" size={24} />}
                                             </div>
-                                            <span className={`text-sm font-black uppercase ${themeText}`}>{p.name}</span>
+                                            <span className={`text-base font-black uppercase tracking-tight ${themeText}`}>{p.name}</span>
                                         </td>
-                                        <td className={`p-5 text-center font-bold ${isDarkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>{p.points || 0}</td>
-                                        <td className="p-5 text-right text-emerald-500 font-black">{p.totalPoints || 0}</td>
+                                        <td className="p-6 text-right font-black text-xl text-emerald-500">{p.totalPoints || 0}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -266,50 +363,65 @@
             );
         };
 
-        const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, isDarkMode, glassClass, themeText, db }) => {
-            
+        const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, isDarkMode, glassClass, themeText, db, setView, populateOfficialCalendar }) => {
+            const handleFileUpload = (e, id, type) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const base64String = reader.result;
+                    const coll = type === 'players' ? 'players' : 'teams';
+                    await updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', coll, id), { [type === 'players' ? 'avatar' : 'logo']: base64String });
+                    alert("Imagem enviada com sucesso!");
+                };
+                reader.readAsDataURL(file);
+            };
+
             if (!adminAuth) return (
                 <div className="p-12 h-[calc(100vh-100px)] flex items-center justify-center">
-                    <div className={`${glassClass} p-8 rounded-3xl w-full max-w-sm text-center`}>
-                        <LucideIcon name="lock" size={40} className="mx-auto text-emerald-500 mb-6" />
-                        <h2 className={`text-xl font-black uppercase mb-6 italic ${themeText}`}>Terminal Master</h2>
-                        <input 
-                            type="password" 
-                            placeholder="SENHA DE ACESSO" 
-                            className={`w-full border p-5 rounded-2xl mb-6 text-center font-black outline-none focus:border-emerald-500 ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`} 
-                            value={adminPassInput} 
-                            onChange={e => setAdminPassInput(e.target.value)} 
-                        />
-                        <button onClick={() => adminPassInput === ADMIN_PASSWORD ? setAdminAuth(true) : alert("Código Inválido")} className="w-full bg-emerald-500 text-black py-4 rounded-xl font-black uppercase italic shadow-lg">Autenticar Sistema</button>
+                    <div className={`${glassClass} p-10 rounded-3xl w-full max-sm text-center relative shadow-2xl`}>
+                        <div className="absolute top-0 right-0 p-4"><button onClick={() => setView('palpites')} className="text-zinc-500 hover:text-red-500 transition-colors"><LucideIcon name="x-circle" size={24} /></button></div>
+                        <LucideIcon name="lock" size={48} className="mx-auto text-emerald-500 mb-6" />
+                        <h2 className={`text-2xl font-black uppercase mb-8 italic ${themeText}`}>Portal Adm</h2>
+                        <input type="password" placeholder="CÓDIGO" className={`w-full border p-5 rounded-2xl mb-6 text-center font-black text-xl outline-none focus:border-emerald-500 transition-all ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`} value={adminPassInput} onChange={e => setAdminPassInput(e.target.value)} />
+                        <button onClick={() => adminPassInput === ADMIN_PASSWORD ? setAdminAuth(true) : alert("Código Inválido")} className="w-full bg-emerald-500 text-black py-5 rounded-2xl font-black uppercase italic shadow-lg active:scale-95 transition-all">Acessar</button>
                     </div>
                 </div>
             );
 
             return (
-                <div className="p-4 pb-32 max-w-4xl mx-auto space-y-6">
-                    <div className={`flex rounded-2xl p-1 gap-1 ${isDarkMode ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
+                <div className="p-6 pb-32 max-w-6xl mx-auto space-y-8 animate-in fade-in">
+                    <div className="flex justify-between items-center bg-zinc-900/50 p-4 rounded-2xl border border-white/5">
+                        <div className="flex items-center gap-2"><LucideIcon name="settings-2" className="text-emerald-500" size={20} /><h2 className={`text-xl font-black uppercase italic tracking-tighter ${themeText}`}>Master Terminal</h2></div>
+                        <button onClick={() => setAdminAuth(false)} className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all"><LucideIcon name="log-out" size={16} /> <span>SAIR</span></button>
+                    </div>
+
+                    <div className={`flex rounded-2xl p-1 gap-1 border ${isDarkMode ? 'bg-zinc-900 border-white/5' : 'bg-zinc-100 border-black/5'}`}>
                         {['rodadas', 'jogadores', 'clubes'].map(tab => (
-                            <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${adminTab === tab ? 'bg-emerald-500 text-black shadow-md' : (isDarkMode ? 'text-zinc-500' : 'text-zinc-400')}`}>{tab}</button>
+                            <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 rounded-xl text-[11px] font-black uppercase transition-all ${adminTab === tab ? 'bg-emerald-500 text-black shadow-md' : (isDarkMode ? 'text-zinc-500' : 'text-zinc-400')}`}>{tab}</button>
                         ))}
                     </div>
 
                     {adminTab === 'rodadas' && (
-                        <div className="space-y-4">
-                            <div className={`${glassClass} p-5 rounded-2xl flex items-center justify-between`}>
-                                <span className={`font-black text-xs ${themeText}`}>{config.rodada_fechada ? 'BLOQUEADO' : 'OPERANTE'}</span>
-                                <button onClick={() => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), { rodada_fechada: !config.rodada_fechada })} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase border ${isDarkMode ? 'bg-white/10 border-white/5' : 'bg-black/5 border-black/5'}`}>Alterar Fluxo</button>
+                        <div className="space-y-6">
+                            <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Sincronizar Calendário Oficial (38 Rodadas)</button>
+                            <div className={`${glassClass} p-6 rounded-3xl flex items-center justify-between border-emerald-500/10`}>
+                                <div className="flex flex-col"><span className={`text-[10px] font-black uppercase mb-1 ${isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Integridade</span><span className={`font-black text-base italic ${config.rodada_fechada ? 'text-red-500' : 'text-emerald-500'}`}>{config.rodada_fechada ? 'TRAVADO' : 'OPERANTE'}</span></div>
+                                <button onClick={() => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), { rodada_fechada: !config.rodada_fechada })} className={`px-6 py-3 rounded-xl font-black uppercase text-[10px] border transition-all ${config.rodada_fechada ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}`}>Mudar</button>
                             </div>
-                            <select value={currentRound} onChange={e => setCurrentRound(parseInt(e.target.value))} className={`w-full p-3 rounded-xl border font-black ${isDarkMode ? 'bg-zinc-900 border-white/10 text-emerald-500' : 'bg-zinc-50 border-black/10 text-emerald-600'}`}>
+                            <select value={currentRound} onChange={e => setCurrentRound(parseInt(e.target.value))} className={`w-full p-4 rounded-2xl border font-black ${isDarkMode ? 'bg-zinc-900 border-white/10 text-emerald-500' : 'bg-zinc-50 border-black/10 text-emerald-600'}`}>
                                 {[...Array(38)].map((_, i) => <option key={i+1} value={i+1}>Editar Rodada {i+1}</option>)}
                             </select>
-                            <div className="space-y-2">
-                                {matches.filter(m => m.round === currentRound).map(m => (
-                                    <div key={m.id} className={`${glassClass} p-3 flex items-center gap-2 rounded-xl`}>
-                                        <span className={`text-[9px] w-24 text-right truncate uppercase font-bold ${themeText}`}>{teams.find(t=>t.id===m.homeId)?.name}</span>
-                                        <input type="number" defaultValue={m.homeScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {homeScore: e.target.value})} className={`w-9 border border-white/10 text-center font-black rounded p-1 ${isDarkMode ? 'bg-black text-emerald-500' : 'bg-white text-emerald-600'}`} />
-                                        <span className="text-zinc-400">X</span>
-                                        <input type="number" defaultValue={m.awayScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {awayScore: e.target.value})} className={`w-9 border border-white/10 text-center font-black rounded p-1 ${isDarkMode ? 'bg-black text-emerald-500' : 'bg-white text-emerald-600'}`} />
-                                        <span className={`text-[9px] flex-1 truncate uppercase font-bold ${themeText}`}>{teams.find(t=>t.id===m.awayId)?.name}</span>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {matches.filter(m => Number(m.round) === Number(currentRound)).map(m => (
+                                    <div key={m.id} className={`${glassClass} p-4 flex items-center gap-4 rounded-2xl`}>
+                                        <span className={`text-[10px] flex-1 text-right truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.homeId)?.name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <input type="number" defaultValue={m.homeScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {homeScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
+                                            <span className="text-zinc-600 font-bold italic text-[10px]">X</span>
+                                            <input type="number" defaultValue={m.awayScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {awayScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
+                                        </div>
+                                        <span className={`text-[10px] flex-1 truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.awayId)?.name}</span>
                                     </div>
                                 ))}
                             </div>
@@ -317,48 +429,36 @@
                     )}
 
                     {adminTab === 'jogadores' && (
-                        <div className="space-y-4">
-                            <button onClick={() => {
-                                const name = prompt("Nome do Novo Jogador:");
-                                if(name) addDoc(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'players'), { name, points: 0, bonusPoints: 0, totalPoints: 0, avatar: "" });
-                            }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest">Adicionar Membro</button>
-                            <div className="space-y-3">
-                                {players.map(p => (
-                                    <div key={p.id} className={`${glassClass} p-4 rounded-xl space-y-3`}>
-                                        <div className="flex justify-between items-center">
-                                            <span className={`font-bold uppercase ${themeText}`}>{p.name}</span>
-                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id))} className="text-red-500/50 hover:text-red-500"><LucideIcon name="trash-2" size={14}/></button>
-                                        </div>
-                                        <input 
-                                            type="text" 
-                                            placeholder="URL da Foto do Perfil" 
-                                            className={`w-full p-3 rounded-lg text-[10px] outline-none ${isDarkMode ? 'bg-black border-white/10 text-zinc-400' : 'bg-zinc-50 border-black/10 text-zinc-600'}`} 
-                                            defaultValue={p.avatar} 
-                                            onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id), { avatar: e.target.value })} 
-                                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {players.map(p => (
+                                <div key={p.id} className={`${glassClass} p-6 rounded-3xl space-y-4`}>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full border border-emerald-500/20 overflow-hidden bg-black/20">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div><span className={`font-black uppercase italic text-sm ${themeText}`}>{p.name}</span></div>
+                                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id))} className="text-red-500/50 hover:text-red-500 p-2 rounded-lg transition-all"><LucideIcon name="trash-2" size={18}/></button>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="flex flex-col gap-2">
+                                        <span className="text-[10px] font-black uppercase text-zinc-500 italic">Bio-Foto Upload</span>
+                                        <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, p.id, 'players')} className="block w-full text-[10px] text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-emerald-500 file:text-black hover:file:bg-emerald-400" />
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
 
                     {adminTab === 'clubes' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {teams.sort((a,b) => (a.name || "").localeCompare(b.name || "")).map(t => (
-                                <div key={t.id} className={`${glassClass} p-3 rounded-xl space-y-2`}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 bg-black/20 rounded flex items-center justify-center overflow-hidden">
-                                            {t.logo ? <img src={t.logo} className="w-6 h-6 object-contain" /> : <LucideIcon name="image" size={14} className="text-zinc-700" />}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {teams.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(t => (
+                                <div key={t.id} className={`${glassClass} p-5 rounded-3xl space-y-4`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center overflow-hidden border border-white/5 p-1">
+                                            {t.logo ? <img src={t.logo} className="w-full h-full object-contain" /> : <LucideIcon name="image" size={16} className="text-zinc-700" />}
                                         </div>
-                                        <span className={`text-[10px] font-black uppercase ${themeText}`}>{t.name}</span>
+                                        <span className={`text-[11px] font-black uppercase italic ${themeText}`}>{t.name}</span>
                                     </div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="URL do Escudo (Link PNG)" 
-                                        className={`w-full p-2 rounded text-[10px] outline-none ${isDarkMode ? 'bg-black/40 border-white/5 text-emerald-400' : 'bg-zinc-100 border-black/5 text-emerald-700'}`} 
-                                        defaultValue={t.logo} 
-                                        onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'teams', t.id), { logo: e.target.value })} 
-                                    />
+                                    <div className="flex flex-col gap-2">
+                                        <span className="text-[10px] font-black uppercase text-zinc-500 italic">Escudo Upload</span>
+                                        <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, t.id, 'teams')} className="block w-full text-[10px] text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-emerald-500 file:text-black" />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -378,7 +478,6 @@
             const [adminAuth, setAdminAuth] = useState(false);
             const [adminPassInput, setAdminPassInput] = useState("");
             const [adminTab, setAdminTab] = useState('rodadas');
-            
             const [players, setPlayers] = useState([]);
             const [teams, setTeams] = useState([]);
             const [matches, setMatches] = useState([]);
@@ -391,9 +490,7 @@
             const glassClass = isDarkMode ? 'glass-dark' : 'glass-light';
 
             useEffect(() => {
-                const init = async () => {
-                    try { await signInAnonymously(auth); } catch (err) { console.error(err); }
-                };
+                const init = async () => { try { await signInAnonymously(auth); } catch (err) { console.error(err); } };
                 init();
                 const unsub = onAuthStateChanged(auth, setUser);
                 return () => unsub();
@@ -401,97 +498,67 @@
 
             useEffect(() => {
                 if (!user) return;
-                const configRef = doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings');
-                onSnapshot(configRef, (docSnap) => {
+                onSnapshot(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), (docSnap) => {
                     if (docSnap.exists()) setConfig(docSnap.data());
+                    else checkInitialData();
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'players'), (snap) => {
-                    const pList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    setPlayers(pList);
-                    if (selectedPlayer) {
-                        const current = pList.find(p => p.id === selectedPlayer.id);
-                        if (current) setSelectedPlayer(current);
-                    }
+                    setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'teams'), (snap) => {
                     setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches'), (snap) => {
-                    setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    setLoading(false);
+                    const mList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setMatches(mList);
+                    if(mList.length > 0) setLoading(false);
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'predictions'), (snap) => {
                     setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
-            }, [user, selectedPlayer?.id]);
+            }, [user]);
+
+            const populateOfficialCalendar = async () => {
+                const matchesRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches');
+                const snap = await getDocs(matchesRef);
+                // Evitar duplicatas
+                if (snap.size > 100) return alert("Calendário já parece estar preenchido!");
+                
+                for (const r of CALENDAR) {
+                    for (const g of r.games) {
+                        await addDoc(matchesRef, { round: r.r, date: r.d, homeId: g[0], awayId: g[1] });
+                    }
+                }
+                alert("Calendário Completo Injetado!");
+            };
+
+            const checkInitialData = async () => {
+                const configRef = doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings');
+                await setDoc(configRef, { rodada_fechada: false });
+                const teamsRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'teams');
+                for (const t of INITIAL_TEAMS) { await setDoc(doc(teamsRef, t.id), { name: t.name, logo: "" }); }
+                await populateOfficialCalendar();
+            };
 
             if (loading) return (
                 <div className="h-screen bg-black flex flex-col items-center justify-center">
                     <div className="w-16 h-16 border-[4px] border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mb-4" />
-                    <p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase">Sincronizando Dados...</p>
+                    <p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase">Sincronizando Sistema...</p>
                 </div>
             );
 
             return (
-                <div className={`min-h-screen overflow-x-hidden relative ${themeBg}`}>
-                    <div className="fixed inset-0 pointer-events-none z-0">
-                        <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] blur-[150px] rounded-full animate-pulse-slow ${isDarkMode ? 'bg-emerald-600/20' : 'bg-emerald-500/10'}`} />
+                <div className={`min-h-screen overflow-x-hidden relative ${themeBg} flex flex-col transition-colors duration-500`}>
+                    <div className="fixed inset-0 pointer-events-none z-0 opacity-10">
+                        <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-600 blur-[150px] rounded-full animate-pulse-slow`} />
                     </div>
-                    <div className="relative z-10">
-                        <Header 
-                            isDarkMode={isDarkMode} 
-                            setIsDarkMode={setIsDarkMode} 
-                            setView={setView} 
-                            view={view} 
-                            selectedPlayer={selectedPlayer} 
-                            players={players} 
-                            setSelectedPlayer={setSelectedPlayer} 
-                        />
-                        <main>
-                            {view === 'palpites' && (
-                                <PalpitesView 
-                                    currentRound={currentRound} 
-                                    setCurrentRound={setCurrentRound} 
-                                    matches={matches} 
-                                    predictions={predictions} 
-                                    teams={teams} 
-                                    selectedPlayer={selectedPlayer} 
-                                    config={config} 
-                                    isDarkMode={isDarkMode} 
-                                    glassClass={glassClass} 
-                                    themeText={themeText} 
-                                    db={db}
-                                />
-                            )}
-                            {view === 'ranking' && (
-                                <RankingView 
-                                    players={players} 
-                                    selectedPlayer={selectedPlayer} 
-                                    isDarkMode={isDarkMode} 
-                                    glassClass={glassClass} 
-                                    themeText={themeText} 
-                                />
-                            )}
-                            {view === 'admin' && (
-                                <AdminView 
-                                    adminAuth={adminAuth} 
-                                    setAdminAuth={setAdminAuth} 
-                                    adminPassInput={adminPassInput} 
-                                    setAdminPassInput={setAdminPassInput} 
-                                    adminTab={adminTab} 
-                                    setAdminTab={setAdminTab} 
-                                    currentRound={currentRound} 
-                                    setCurrentRound={setCurrentRound} 
-                                    config={config} 
-                                    matches={matches} 
-                                    teams={teams} 
-                                    players={players} 
-                                    isDarkMode={isDarkMode} 
-                                    glassClass={glassClass} 
-                                    themeText={themeText} 
-                                    db={db}
-                                />
-                            )}
+                    <div className="relative z-10 flex-1 flex flex-col">
+                        <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} setView={setView} view={view} selectedPlayer={selectedPlayer} players={players} setSelectedPlayer={setSelectedPlayer} />
+                        <main className="flex-1 w-full max-w-6xl mx-auto">
+                            {view === 'palpites' && <PalpitesView currentRound={currentRound} setCurrentRound={setCurrentRound} matches={matches} predictions={predictions} teams={teams} selectedPlayer={selectedPlayer} config={config} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
+                            {view === 'ranking' && <RankingView players={players} selectedPlayer={selectedPlayer} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} />}
+                            {view === 'bonus' && <BonusView selectedPlayer={selectedPlayer} teams={teams} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
+                            {view === 'admin' && <AdminView adminAuth={adminAuth} setAdminAuth={setAdminAuth} adminPassInput={adminPassInput} setAdminPassInput={setAdminPassInput} adminTab={adminTab} setAdminTab={setAdminTab} currentRound={currentRound} setCurrentRound={setCurrentRound} config={config} matches={matches} teams={teams} players={players} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} setView={setView} populateOfficialCalendar={populateOfficialCalendar} />}
                         </main>
                         <Navigation setView={setView} view={view} isDarkMode={isDarkMode} />
                     </div>
