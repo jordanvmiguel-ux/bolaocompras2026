@@ -362,7 +362,7 @@
             );
         };
 
-        const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, isDarkMode, glassClass, themeText, db, setView, populateOfficialCalendar }) => {
+        const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, predictions, isDarkMode, glassClass, themeText, db, setView, populateOfficialCalendar }) => {
             const [newPlayerName, setNewPlayerName] = useState("");
             
             const handleFileUpload = (e, id, type) => {
@@ -403,6 +403,65 @@
                 alert("Projeções desbloqueadas para este participante!");
             };
 
+            // --- LÓGICA DE CÁLCULO DE PONTOS ---
+            const processPoints = async () => {
+                if (!confirm("Deseja recalcular todos os pontos com base nos resultados atuais?")) return;
+                
+                for (const player of players) {
+                    let matchPoints = 0;
+                    
+                    // Agrupar jogos por rodada para "Rodada Perfeita"
+                    const matchesByRound = {};
+                    matches.forEach(m => {
+                        if (!matchesByRound[m.round]) matchesByRound[m.round] = [];
+                        matchesByRound[m.round].push(m);
+                    });
+
+                    Object.keys(matchesByRound).forEach(rNum => {
+                        const roundMatches = matchesByRound[rNum].filter(m => m.homeScore !== undefined && m.homeScore !== "");
+                        if (roundMatches.length === 0) return;
+
+                        let roundOutcomeHits = 0;
+                        let roundScore = 0;
+
+                        roundMatches.forEach(m => {
+                            const pred = predictions.find(pr => pr.playerId === player.id && pr.matchId === m.id);
+                            if (pred && pred.homeScore !== "" && pred.awayScore !== "" && pred.homeScore !== undefined) {
+                                const rH = parseInt(m.homeScore);
+                                const rA = parseInt(m.awayScore);
+                                const pH = parseInt(pred.homeScore);
+                                const pA = parseInt(pred.awayScore);
+
+                                const actualResult = rH > rA ? 'H' : rH < rA ? 'A' : 'D';
+                                const predResult = pH > pA ? 'H' : pH < pA ? 'A' : 'D';
+
+                                if (rH === pH && rA === pA) {
+                                    roundScore += 5; // Placar exato
+                                    roundOutcomeHits++;
+                                } else if (actualResult === predResult) {
+                                    roundScore += 3; // Resultado correto
+                                    roundOutcomeHits++;
+                                } else {
+                                    roundScore -= 1; // Erro
+                                }
+                            }
+                        });
+
+                        // Rodada Perfeita: acertar o resultado de todos os jogos da rodada que já aconteceram
+                        if (roundOutcomeHits === roundMatches.length && roundMatches.length > 0) {
+                            roundScore += 3;
+                        }
+                        
+                        matchPoints += roundScore;
+                    });
+
+                    await updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', player.id), {
+                        totalPoints: matchPoints + (player.bonusPoints || 0)
+                    });
+                }
+                alert("Rede Neural atualizada! Pontuações sincronizadas.");
+            };
+
             if (!adminAuth) return (
                 <div className="p-12 h-[calc(100vh-100px)] flex items-center justify-center">
                     <div className={`${glassClass} p-10 rounded-3xl w-full max-sm text-center relative shadow-2xl`}>
@@ -423,24 +482,34 @@
                     </div>
 
                     <div className={`flex rounded-2xl p-1 gap-1 border ${isDarkMode ? 'bg-zinc-900 border-white/5' : 'bg-zinc-100 border-black/5'}`}>
-                        {['rodadas', 'jogadores', 'clubes'].map(tab => (
+                        {['rodadas', 'resultados', 'jogadores', 'clubes'].map(tab => (
                             <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 rounded-xl text-[11px] font-black uppercase transition-all ${adminTab === tab ? 'bg-emerald-500 text-black shadow-md' : (isDarkMode ? 'text-zinc-500' : 'text-zinc-400')}`}>{tab}</button>
                         ))}
                     </div>
 
                     {adminTab === 'rodadas' && (
                         <div className="space-y-6">
-                            <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Limpar Banco e Sincronizar Calendário (R1 a R38)</button>
+                            <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Sincronizar Calendário Oficial (R1 a R38)</button>
                             <div className={`${glassClass} p-6 rounded-3xl flex items-center justify-between border-emerald-500/10`}>
                                 <div className="flex flex-col"><span className={`text-[10px] font-black uppercase mb-1 ${isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Integridade</span><span className={`font-black text-base italic ${config.rodada_fechada ? 'text-red-500' : 'text-emerald-500'}`}>{config.rodada_fechada ? 'TRAVADO' : 'OPERANTE'}</span></div>
                                 <button onClick={() => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), { rodada_fechada: !config.rodada_fechada })} className={`px-6 py-3 rounded-xl font-black uppercase text-[10px] border transition-all ${config.rodada_fechada ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}`}>Mudar</button>
                             </div>
+                        </div>
+                    )}
+
+                    {adminTab === 'resultados' && (
+                        <div className="space-y-6">
+                            <button onClick={processPoints} className="w-full bg-emerald-600 text-black py-5 rounded-3xl font-black uppercase italic shadow-[0_0_25px_rgba(16,185,129,0.3)] hover:brightness-110 active:scale-95 transition-all">
+                                 <LucideIcon name="zap" className="inline mr-2" /> Calcular Pontuação e Atualizar Ranking
+                            </button>
+                            
                             <select value={currentRound} onChange={e => setCurrentRound(parseInt(e.target.value))} className={`w-full p-4 rounded-2xl border font-black ${isDarkMode ? 'bg-zinc-900 border-white/10 text-emerald-500' : 'bg-zinc-50 border-black/10 text-emerald-600'}`}>
-                                {[...Array(38)].map((_, i) => <option key={i+1} value={i+1}>Editar Rodada {i+1}</option>)}
+                                {[...Array(38)].map((_, i) => <option key={i+1} value={i+1}>Resultados Oficiais: Rodada {i+1}</option>)}
                             </select>
+
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {matches.filter(m => Number(m.round) === Number(currentRound)).map(m => (
-                                    <div key={m.id} className={`${glassClass} p-4 flex items-center gap-4 rounded-2xl relative group`}>
+                                    <div key={m.id} className={`${glassClass} p-4 flex items-center gap-4 rounded-2xl relative group border-l-4 border-emerald-500/50`}>
                                         <span className={`text-[10px] flex-1 text-right truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.homeId)?.name}</span>
                                         <div className="flex items-center gap-2">
                                             <input type="number" defaultValue={m.homeScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {homeScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 focus:border-emerald-500 outline-none ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
@@ -600,7 +669,7 @@
                             {view === 'palpites' && <PalpitesView currentRound={currentRound} setCurrentRound={setCurrentRound} matches={matches} predictions={predictions} teams={teams} selectedPlayer={selectedPlayer} config={config} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
                             {view === 'ranking' && <RankingView players={players} selectedPlayer={selectedPlayer} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} />}
                             {view === 'bonus' && <BonusView selectedPlayer={selectedPlayer} teams={teams} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
-                            {view === 'admin' && <AdminView adminAuth={adminAuth} setAdminAuth={setAdminAuth} adminPassInput={adminPassInput} setAdminPassInput={setAdminPassInput} adminTab={adminTab} setAdminTab={setAdminTab} currentRound={currentRound} setCurrentRound={setCurrentRound} config={config} matches={matches} teams={teams} players={players} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} setView={setView} populateOfficialCalendar={populateOfficialCalendar} />}
+                            {view === 'admin' && <AdminView adminAuth={adminAuth} setAdminAuth={setAdminAuth} adminPassInput={adminPassInput} setAdminPassInput={setAdminPassInput} adminTab={adminTab} setAdminTab={setAdminTab} currentRound={currentRound} setCurrentRound={setCurrentRound} config={config} matches={matches} teams={teams} players={players} predictions={predictions} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} setView={setView} populateOfficialCalendar={populateOfficialCalendar} />}
                         </main>
                         <Navigation setView={setView} view={view} isDarkMode={isDarkMode} />
                     </div>
