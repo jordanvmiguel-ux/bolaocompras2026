@@ -94,7 +94,6 @@
             { id: 'vas', name: 'Vasco da Gama' }, { id: 'vit', name: 'Vitória' }
         ];
 
-        // Calendário Completo de 38 Rodadas
         const CALENDAR = [
             { r: 1, d: '01/02', games: [['flu','gre'],['bot','cru'],['spa','fla'],['cor','bah'],['mir','vas'],['atm','pal'],['int','ath'],['crt','rbb'],['vit','rem'],['cha','san']] },
             { r: 2, d: '04/02', games: [['fla','int'],['vas','cha'],['san','spa'],['pal','vit'],['rbb','atm'],['cru','crt'],['gre','bot'],['ath','cor'],['bah','flu'],['rem','mir']] },
@@ -309,7 +308,7 @@
                             <h3 className={`font-black uppercase mb-4 ${themeText}`}>G4 (Elite)</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {teams.sort((a,b)=>a.name.localeCompare(b.name)).map(t => (
-                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'g4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2 ${bonus.g4.includes(t.id) ? 'bg-emerald-500 text-black shadow-lg scale-105' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
+                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'g4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase ${bonus.g4.includes(t.id) ? 'bg-emerald-500 text-black shadow-lg' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
                                         <div className="w-8 h-8 mx-auto mb-2">{t.logo ? <img src={t.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" size={16} />}</div>
                                         {t.name.split(' ')[0]}
                                     </button>
@@ -320,7 +319,7 @@
                             <h3 className={`font-black uppercase mb-4 ${themeText}`}>Z4 (Rebaixamento)</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {teams.sort((a,b)=>a.name.localeCompare(b.name)).map(t => (
-                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'z4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2 ${bonus.z4.includes(t.id) ? 'bg-red-500 text-black shadow-lg scale-105' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
+                                    <button key={t.id} onClick={() => toggleSelection(t.id, 'z4')} className={`p-3 rounded-2xl border text-[10px] font-black uppercase ${bonus.z4.includes(t.id) ? 'bg-red-500 text-black shadow-lg' : (isDarkMode ? 'bg-black/40 border-white/5 text-zinc-500' : 'bg-zinc-50 border-black/5 text-zinc-400')}`}>
                                         <div className="w-8 h-8 mx-auto mb-2">{t.logo ? <img src={t.logo} className="w-full h-full object-contain" /> : <LucideIcon name="shield" size={16} />}</div>
                                         {t.name.split(' ')[0]}
                                     </button>
@@ -419,7 +418,7 @@
 
                     {adminTab === 'rodadas' && (
                         <div className="space-y-6">
-                            <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Sincronizar Calendário Oficial (38 Rodadas)</button>
+                            <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Limpar Banco e Sincronizar Calendário (R1 a R38)</button>
                             <div className={`${glassClass} p-6 rounded-3xl flex items-center justify-between border-emerald-500/10`}>
                                 <div className="flex flex-col"><span className={`text-[10px] font-black uppercase mb-1 ${isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Integridade</span><span className={`font-black text-base italic ${config.rodada_fechada ? 'text-red-500' : 'text-emerald-500'}`}>{config.rodada_fechada ? 'TRAVADO' : 'OPERANTE'}</span></div>
                                 <button onClick={() => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), { rodada_fechada: !config.rodada_fechada })} className={`px-6 py-3 rounded-xl font-black uppercase text-[10px] border transition-all ${config.rodada_fechada ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}`}>Mudar</button>
@@ -553,24 +552,40 @@
                 const matchesRef = collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches');
                 const snap = await getDocs(matchesRef);
                 
-                // Limpeza se houver duplicatas
-                const duplicates = snap.docs.filter(d => d.id.length > 20); // IDs do addDoc sao longos
-                for (const d of duplicates) {
+                // Mapeia resultados já inseridos para não perdê-los durante a limpeza
+                const resultsBackup = {};
+                snap.docs.forEach(d => {
+                    const data = d.data();
+                    if (data.homeScore !== undefined || data.awayScore !== undefined) {
+                        const key = `r${data.round}_${data.homeId}_vs_${data.awayId}`;
+                        resultsBackup[key] = { h: data.homeScore, a: data.awayScore };
+                    }
+                });
+
+                // Deleta todos os documentos atuais para limpar duplicatas antigas
+                for (const d of snap.docs) {
                     await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', d.id));
                 }
 
+                // Insere o calendário oficial com IDs únicos e restaurando resultados
                 for (const r of CALENDAR) {
                     for (const g of r.games) {
                         const matchId = `r${r.r}_${g[0]}_vs_${g[1]}`;
-                        await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', matchId), { 
+                        const matchData = { 
                             round: r.r, 
                             date: r.d, 
                             homeId: g[0], 
                             awayId: g[1] 
-                        });
+                        };
+                        // Se esse jogo já tinha resultado antes da limpeza, restaura
+                        if (resultsBackup[matchId]) {
+                            matchData.homeScore = resultsBackup[matchId].h;
+                            matchData.awayScore = resultsBackup[matchId].a;
+                        }
+                        await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', matchId), matchData);
                     }
                 }
-                alert("Calendário Sincronizado e Limpo!");
+                alert("Calendário Sincronizado e Duplicados Removidos!");
             };
 
             const checkInitialData = async () => {
