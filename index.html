@@ -135,7 +135,7 @@
             { r: 38, d: '02/12', games: [['fla','cha'],['vas','vit'],['san','bot'],['pal','crt'],['rbb','flu'],['cru','int'],['gre','mir'],['ath','spa']] }
         ];
 
-        // --- COMPONENTES AUXILIARES ---
+        // --- COMPONENTES AUXILIARES GLOBAIS ---
 
         const LucideIcon = ({ name, size = 24, className = "" }) => {
             const containerRef = useRef(null);
@@ -196,7 +196,7 @@
                     { id: 'bonus', icon: 'target', label: 'Quem é Quem' },
                     { id: 'ranking', icon: 'bar-chart-3', label: 'Ranking' }
                 ].map(item => (
-                    <button key={item.id} onClick={() => setView(item.id)} className={`flex flex-col items-center transition-all ${view === item.id ? 'text-emerald-500 scale-110' : (isDarkMode ? 'text-zinc-600' : 'text-zinc-400')}`}>
+                    <button key={item.id} onClick={() => setView(item.id)} className={`flex flex-col items-center transition-all ${view === item.id ? 'text-emerald-400 scale-110' : (isDarkMode ? 'text-zinc-600' : 'text-zinc-400')}`}>
                         <LucideIcon name={item.icon} size={24} />
                         <span className="text-[9px] font-black mt-1 uppercase tracking-tighter">{item.label}</span>
                     </button>
@@ -437,19 +437,18 @@
 
             const safeDeletePlayer = async (player) => {
                 if (!confirm(`Deseja mover ${player.name} para a lixeira?`)) return;
-                // Backup para lixeira
                 await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'deleted_players', player.id), player);
-                // Deleta da lista ativa
                 await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', player.id));
                 alert("Movido para a lixeira!");
             };
 
             const restorePlayer = async (player) => {
-                if (!confirm(`Restaurar perfil de ${player.name}?`)) return;
+                if (!confirm(`Restaurar perfil e palpites de ${player.name}?`)) return;
                 const { id, ...data } = player;
+                // Ao usar o ID original (id), os palpites na coleção predictions voltarão a ser linkados
                 await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', id), data);
                 await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'deleted_players', id));
-                alert("Perfil restaurado com sucesso!");
+                alert(`Perfil de ${player.name} restaurado com sucesso! Seus palpites originais agora estão ativos.`);
             };
 
             if (!adminAuth) return (
@@ -473,7 +472,7 @@
 
                     <div className={`flex rounded-2xl p-1 gap-1 border ${isDarkMode ? 'bg-zinc-900 border-white/5' : 'bg-zinc-100 border-black/5'}`}>
                         {['rodadas', 'resultados', 'jogadores', 'clubes'].map(tab => (
-                            <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-4 rounded-xl text-[11px] font-black uppercase transition-all ${adminTab === tab ? 'bg-emerald-500 text-black shadow-md' : (isDarkMode ? 'text-zinc-500' : 'text-zinc-400')}`}>{tab}</button>
+                            <button key={tab} onClick={() => setAdminTab(tab)} className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase transition-all ${adminTab === tab ? 'bg-emerald-500 text-black shadow-md' : (isDarkMode ? 'text-zinc-500' : 'text-zinc-400')}`}>{tab}</button>
                         ))}
                     </div>
 
@@ -526,16 +525,20 @@
                             </div>
 
                             {deletedPlayers.length > 0 && (
-                                <div className="mt-12">
-                                    <h3 className="text-amber-500 font-black uppercase italic text-sm mb-4 tracking-widest px-2">Lixeira de Bio-IDs (Recuperar Excluídos)</h3>
+                                <div className="mt-12 bg-amber-500/5 p-6 rounded-3xl border border-amber-500/20">
+                                    <h3 className="text-amber-500 font-black uppercase italic text-sm mb-4 tracking-widest px-2 flex items-center gap-2">
+                                        <LucideIcon name="trash-2" size={18} /> Lixeira de Bio-IDs (Restaurar)
+                                    </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {deletedPlayers.map(p => (
-                                            <div key={p.id} className={`${glassClass} p-4 rounded-2xl flex justify-between items-center opacity-60 hover:opacity-100 transition-opacity border-dashed border-amber-500/30`}>
+                                            <div key={p.id} className={`${glassClass} p-4 rounded-2xl flex justify-between items-center border-dashed border-amber-500/30`}>
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div>
-                                                    <span className="font-bold text-zinc-400">{p.name}</span>
+                                                    <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden border border-white/10">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div>
+                                                    <span className="font-black text-zinc-400 uppercase italic text-xs">{p.name}</span>
                                                 </div>
-                                                <button onClick={() => restorePlayer(p)} className="text-emerald-500 p-2 bg-emerald-500/10 rounded-lg hover:bg-emerald-500 transition-colors flex items-center gap-2 text-[10px] font-black uppercase"><LucideIcon name="refresh-cw" size={12}/> RESTAURAR</button>
+                                                <button onClick={() => restorePlayer(p)} className="bg-amber-500 text-black px-4 py-2 rounded-xl hover:bg-amber-400 transition-colors flex items-center gap-2 text-[9px] font-black uppercase">
+                                                    <LucideIcon name="refresh-cw" size={12}/> Restaurar
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -610,9 +613,8 @@
                     setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches'), (snap) => {
-                    const mList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    setMatches(mList);
-                    if(mList.length > 0) setLoading(false);
+                    setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    setLoading(false);
                 });
                 onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'predictions'), (snap) => {
                     setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -639,7 +641,7 @@
                         await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', matchId), matchData);
                     }
                 }
-                alert("Sincronizado!");
+                alert("Calendário Sincronizado!");
             };
 
             const checkInitialData = async () => {
@@ -657,7 +659,7 @@
                     <div className="fixed inset-0 pointer-events-none z-0 opacity-10"><div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-600 blur-[150px] rounded-full animate-pulse-slow`} /></div>
                     <div className="relative z-10 flex-1 flex flex-col">
                         <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} setView={setView} view={view} selectedPlayer={selectedPlayer} players={players} setSelectedPlayer={setSelectedPlayer} />
-                        <main className="flex-1 w-full max-w-6xl mx-auto">
+                        <main className="relative z-10 flex-1">
                             {view === 'palpites' && <PalpitesView currentRound={currentRound} setCurrentRound={setCurrentRound} matches={matches} predictions={predictions} teams={teams} selectedPlayer={selectedPlayer} config={config} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
                             {view === 'classicos' && <ClassicosView matches={matches} predictions={predictions} teams={teams} selectedPlayer={selectedPlayer} config={config} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} db={db} />}
                             {view === 'ranking' && <RankingView players={players} selectedPlayer={selectedPlayer} isDarkMode={isDarkMode} glassClass={glassClass} themeText={themeText} />}
