@@ -132,7 +132,7 @@
             { r: 35, d: '18/11', games: [['fla','ath'],['vas','int'],['spa','flu'],['cor','bot'],['mir','atm'],['cru','pal'],['gre','bah'],['crt','san'],['vit','rbb'],['rem','cha']] },
             { r: 36, d: '22/11', games: [['flu','mir'],['bot','spa'],['san','gre'],['pal','fla'],['rbb','vas'],['atm','cor'],['int','vit'],['ath','rem'],['bah','crt'],['cha','cru']] },
             { r: 37, d: '29/11', games: [['flu','cru'],['bot','bah'],['spa','rem'],['cor','gre'],['mir','ath'],['atm','vas'],['int','rbb'],['crt','fla'],['vit','san'],['cha','pal']] },
-            { r: 38, d: '02/12', games: [['fla','cha'],['vas','vit'],['san','bot'],['pal','crt'],['rbb','flu'],['cru','int'],['gre','mir'],['ath','spa'],['cor','rem'],['atm','bah']] }
+            { r: 38, d: '02/12', games: [['fla','cha'],['vas','vit'],['san','bot'],['pal','crt'],['rbb','flu'],['cru','int'],['gre','mir'],['ath','spa']] }
         ];
 
         // --- COMPONENTES AUXILIARES ---
@@ -369,8 +369,18 @@
 
         const AdminView = ({ adminAuth, setAdminAuth, adminPassInput, setAdminPassInput, adminTab, setAdminTab, currentRound, setCurrentRound, config, matches, teams, players, predictions, isDarkMode, glassClass, themeText, db, setView, populateOfficialCalendar }) => {
             const [newPlayerName, setNewPlayerName] = useState("");
+            const [deletedPlayers, setDeletedPlayers] = useState([]);
             const [customMatch, setCustomMatch] = useState({ homeId: "", awayId: "" });
             
+            // Sincronizar lixeira
+            useEffect(() => {
+                if (adminAuth) {
+                    onSnapshot(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'deleted_players'), (snap) => {
+                        setDeletedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    });
+                }
+            }, [adminAuth]);
+
             const handleFileUpload = (e, id, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -425,16 +435,21 @@
                 alert("Rankings sincronizados!");
             };
 
-            const handleDeleteMatch = async (id) => {
-                if (!confirm("Excluir jogo permanentemente?")) return;
-                await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', id));
-                alert("Jogo excluído!");
+            const safeDeletePlayer = async (player) => {
+                if (!confirm(`Deseja mover ${player.name} para a lixeira?`)) return;
+                // Backup para lixeira
+                await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'deleted_players', player.id), player);
+                // Deleta da lista ativa
+                await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', player.id));
+                alert("Movido para a lixeira!");
             };
 
-            const handleUnlockBonus = async (playerId) => {
-                if (!confirm("Desbloquear projeções deste jogador?")) return;
-                await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'bonus', playerId));
-                alert("Desbloqueado!");
+            const restorePlayer = async (player) => {
+                if (!confirm(`Restaurar perfil de ${player.name}?`)) return;
+                const { id, ...data } = player;
+                await setDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', id), data);
+                await deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'deleted_players', id));
+                alert("Perfil restaurado com sucesso!");
             };
 
             if (!adminAuth) return (
@@ -466,7 +481,7 @@
                         <div className="space-y-6">
                             <button onClick={populateOfficialCalendar} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg">Sincronizar Calendário Oficial (R1 a R38)</button>
                             <div className={`${glassClass} p-6 rounded-3xl flex items-center justify-between border-emerald-500/10 shadow-2xl`}>
-                                <div className="flex flex-col"><span className={`text-[10px] font-black uppercase mb-1 ${isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Integridade</span><span className={`font-black text-base italic ${config.rodada_fechada ? 'text-red-500' : 'text-emerald-500'}`}>{config.rodada_fechada ? 'SISTEMA TRAVADO' : 'COLETA EM OPERAÇÃO'}</span></div>
+                                <div className="flex flex-col"><span className={`text-[10px] font-black uppercase mb-1 ${isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Integridade</span><span className={`font-black text-base italic ${config.rodada_fechada ? 'text-red-500' : 'text-emerald-500'}`}>{config.rodada_fechada ? 'TRAVADO' : 'OPERANTE'}</span></div>
                                 <button onClick={() => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'config', 'settings'), { rodada_fechada: !config.rodada_fechada })} className={`px-6 py-3 rounded-xl font-black uppercase text-[10px] border transition-all ${config.rodada_fechada ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}`}>Mudar</button>
                             </div>
                         </div>
@@ -489,7 +504,7 @@
                                             <input type="number" defaultValue={m.awayScore} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id), {awayScore: e.target.value})} className={`w-10 h-10 border border-white/10 text-center font-black rounded-lg text-emerald-500 ${isDarkMode ? 'bg-black' : 'bg-white'}`} />
                                         </div>
                                         <span className={`text-[10px] flex-1 truncate uppercase font-black ${themeText}`}>{teams.find(t=>t.id===m.awayId)?.name}</span>
-                                        <button onClick={() => handleDeleteMatch(m.id)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"><LucideIcon name="trash-2" size={16} /></button>
+                                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'matches', m.id))} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"><LucideIcon name="trash-2" size={16} /></button>
                                     </div>
                                 ))}
                             </div>
@@ -499,15 +514,33 @@
                     {adminTab === 'jogadores' && (
                         <div className="space-y-6">
                             <div className={`${glassClass} p-6 rounded-3xl space-y-4 shadow-xl`}><div className="flex gap-2"><input type="text" placeholder="Novo Bio-ID" className={`flex-1 p-4 rounded-2xl border font-black outline-none ${isDarkMode ? 'bg-zinc-900 border-white/10 text-white' : 'bg-zinc-50 border-black/10 text-black'}`} value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} /><button onClick={() => { if(!newPlayerName.trim()) return; addDoc(collection(db, 'artifacts', appIdFirestore, 'public', 'data', 'players'), { name: newPlayerName.trim(), totalPoints: 0, bonusPoints: 0, avatar: "" }); setNewPlayerName(""); alert("Adicionado!"); }} className="bg-emerald-500 text-black px-6 py-4 rounded-2xl font-black uppercase text-xs">Add</button></div></div>
+                            
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {players.map(p => (
                                     <div key={p.id} className={`${glassClass} p-6 rounded-3xl space-y-4 transition-all hover:border-emerald-500/30 shadow-xl`}>
-                                        <div className="flex justify-between items-center"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full border border-emerald-500/20 overflow-hidden bg-black/20">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div><span className={`font-black uppercase italic text-sm ${themeText}`}>{p.name}</span></div><div className="flex gap-2"><button onClick={() => handleUnlockBonus(p.id)} className="text-amber-500 p-2 rounded-lg hover:bg-amber-500/10 transition-all"><LucideIcon name="unlock" size={18}/></button><button onClick={() => deleteDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id))} className="text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-all"><LucideIcon name="trash-2" size={18}/></button></div></div>
+                                        <div className="flex justify-between items-center"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full border border-emerald-500/20 overflow-hidden bg-black/20">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div><span className={`font-black uppercase italic text-sm ${themeText}`}>{p.name}</span></div><div className="flex gap-2"><button onClick={() => handleUnlockBonus(p.id)} className="text-amber-500 p-2 rounded-lg hover:bg-amber-500/10 transition-all"><LucideIcon name="unlock" size={18}/></button><button onClick={() => safeDeletePlayer(p)} className="text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-all"><LucideIcon name="trash-2" size={18}/></button></div></div>
                                         <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, p.id, 'players')} className="block w-full text-[10px] text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-emerald-500 file:text-black font-bold" />
                                         <div className="flex items-center gap-2"><span className="text-[9px] font-black uppercase text-zinc-500">Pts Bônus:</span><input type="number" className={`w-20 p-2 rounded-lg text-xs font-bold ${isDarkMode ? 'bg-black' : 'bg-white'}`} defaultValue={p.bonusPoints} onBlur={e => updateDoc(doc(db, 'artifacts', appIdFirestore, 'public', 'data', 'players', p.id), { bonusPoints: parseInt(e.target.value) || 0 })} /></div>
                                     </div>
                                 ))}
                             </div>
+
+                            {deletedPlayers.length > 0 && (
+                                <div className="mt-12">
+                                    <h3 className="text-amber-500 font-black uppercase italic text-sm mb-4 tracking-widest px-2">Lixeira de Bio-IDs (Recuperar Excluídos)</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {deletedPlayers.map(p => (
+                                            <div key={p.id} className={`${glassClass} p-4 rounded-2xl flex justify-between items-center opacity-60 hover:opacity-100 transition-opacity border-dashed border-amber-500/30`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden">{p.avatar && <img src={p.avatar} className="w-full h-full object-cover" />}</div>
+                                                    <span className="font-bold text-zinc-400">{p.name}</span>
+                                                </div>
+                                                <button onClick={() => restorePlayer(p)} className="text-emerald-500 p-2 bg-emerald-500/10 rounded-lg hover:bg-emerald-500 transition-colors flex items-center gap-2 text-[10px] font-black uppercase"><LucideIcon name="refresh-cw" size={12}/> RESTAURAR</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -617,7 +650,7 @@
                 await populateOfficialCalendar();
             };
 
-            if (loading) return <div className="h-screen bg-black flex flex-col items-center justify-center"><div className="w-16 h-16 border-[4px] border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-lg" /><p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase">Iniciando Sincronia...</p></div>;
+            if (loading) return <div className="h-screen bg-black flex flex-col items-center justify-center"><div className="w-16 h-16 border-[4px] border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-lg" /><p className="text-emerald-500 font-black tracking-[0.4em] text-[10px] animate-pulse uppercase">Iniciando Biometria...</p></div>;
 
             return (
                 <div className={`min-h-screen overflow-x-hidden relative ${themeBg} flex flex-col transition-colors duration-500`}>
